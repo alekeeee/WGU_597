@@ -1,0 +1,165 @@
+================================================================================
+                    HEALTH TRACKER DATABASE - ERD
+              Organized by 6-Layer Design Pattern
+================================================================================
+
+
+    LAYER 1                           LAYER 2
+    CORE ENTITIES                     REFERENCE TABLES
+    ─────────────────                 ─────────────────────────────────────────
+    ┌──────────────────┐              ┌─────────────────┐  ┌─────────────────┐
+    │   Practitioner   │              │  Condition_Ref  │  │ Medication_Ref  │
+    ├──────────────────┤              ├─────────────────┤  ├─────────────────┤
+    │ PK  npi          │              │ PK  code        │  │ PK  medication_ │
+    │     first_name   │              │     condition_  │  │         id      │
+    │     last_name    │              │     description │  │     generic_    │
+    │     specialty    │              └─────────────────┘  │         name    │
+    │     gender       │                      │           │     brand_name  │
+    │     phone_number │                      │           │     dose_form   │
+    │     email_address│                      │           │     strength_*  │
+    └──────────────────┘                      │           └─────────────────┘
+            │                                 │                   │
+            │                                 │                   │
+    ┌───────┴──────────┐              ┌───────┴───────┐   ┌──────┴────────┐
+    │      User        │              │  Metric_Ref   │   │  Device_Ref   │
+    ├──────────────────┤              ├───────────────┤   ├───────────────┤
+    │ PK  user_id      │              │ PK  metric    │   │ PK  model_id  │
+    │     password_hash│              │     metric_   │   │     manufact- │
+    │     gender       │              │     descript- │   │         urer  │
+    │     race         │              │         ion   │   │     model_    │
+    │     ethnicity    │              │     unit_of_  │   │         name  │
+    │     birthdate    │              │     measure   │   │     device_   │
+    └──────────────────┘              └───────────────┘   │         type  │
+            │                                 │           └───────────────┘
+            │                                 │                   │
+════════════╪═════════════════════════════════╪═══════════════════╪═══════════
+            │                                 │                   │
+    LAYER 3 │                         LAYER 4 │                   │
+    USER PROFILE                      CLINICAL TRANSACTIONS       │
+    ─────────────────                 ──────────────────────      │
+            │                                 │                   │
+    ┌───────┴──────────┐              ┌───────┴───────────────────┴───────────┐
+    │    User_Info     │              │                                       │
+    ├──────────────────┤              │  ┌─────────────────┐                  │
+    │ PK  user_id (FK) │              │  │   Appointment   │                  │
+    │ PK  effective_   │              │  ├─────────────────┤                  │
+    │         date     │              │  │ PK  appointment_│                  │
+    │     first_name   │◄─────────────┤  │         id      │                  │
+    │     last_name    │              │  │ FK  user_id     │                  │
+    │     address_1    │              │  │ FK  npi         │                  │
+    │     city/state/  │              │  │     start/end_  │                  │
+    │         zip      │              │  │     datetime    │                  │
+    │     email/phone  │              │  │     status      │                  │
+    └──────────────────┘              │  └─────────────────┘                  │
+     (SCD Type 2:                     │                                       │
+      tracks history)                 │  ┌──────────────────┐                 │
+                                      │  │Patient_Condition │                 │
+                                      │  ├──────────────────┤                 │
+                                      │  │ PK  user_id (FK) │                 │
+                                      │  │ PK  condition_   │                 │
+                                      │  │     code (FK)    │                 │
+                                      │  │ PK  effective_   │                 │
+                                      │  │         date     │                 │
+                                      │  │     clinical_    │                 │
+                                      │  │         status   │                 │
+                                      │  │     severity     │                 │
+                                      │  └──────────────────┘                 │
+                                      │                                       │
+                                      │  ┌───────────────────┐                │
+                                      │  │Medication_Request │                │
+                                      │  ├───────────────────┤                │
+                                      │  │ PK  medication_   │                │
+                                      │  │     request_id    │                │
+                                      │  │ PK  user_id (FK)  │                │
+                                      │  │ PK  request_date  │                │
+                                      │  │ FK  medication_id │                │
+                                      │  │ FK  npi           │                │
+                                      │  │     status        │                │
+                                      │  └───────────────────┘                │
+                                      └───────────────────────────────────────┘
+════════════════════════════════════════════════════════════════════════════════
+
+    LAYER 5                                      LAYER 6
+    DEVICE CONFIGURATION                         TELEMETRY DATA
+    ────────────────────                         ──────────────────────────────
+
+    ┌─────────────────────┐                      ┌──────────────────────────┐
+    │ Device_Capabilities │                      │      Observation         │
+    ├─────────────────────┤                      ├──────────────────────────┤
+    │ PK  model_id (FK)   │                      │ PK  observation_id       │
+    │ PK  metric (FK)     │                      │ FK  user_id              │
+    └─────────────────────┘                      │ FK  profile_id           │
+            │                                    │ FK  metric               │
+            │                                    │     date_time            │
+    ┌───────┴─────────────┐                      │     value                │
+    │ User_Device_Profile │                      │     comments             │
+    ├─────────────────────┤                      └──────────────────────────┘
+    │ PK  profile_id      │                               ▲
+    │ FK  user_id         │───────────────────────────────┤
+    │ FK  model_id        │                               │
+    │     custom_device_  │                      (EAV Pattern: stores all
+    │         name        │                       metric readings vertically
+    │     date_added      │                       for scalability)
+    │     is_active       │
+    └─────────────────────┘
+            │
+            │
+    ┌───────┴─────────────┐
+    │  User_Device_Config │
+    ├─────────────────────┤
+    │ PK  config_id       │
+    │ FK  profile_id      │
+    │ FK  metric          │
+    └─────────────────────┘
+
+
+================================================================================
+                         RELATIONSHIP SUMMARY
+================================================================================
+
+  LAYER FLOW: Core Entities → Reference Tables → User Profile →
+              Clinical Transactions → Device Configuration → Telemetry
+
+  ┌────────────────────────────────────────────────────────────────────────────┐
+  │ KEY RELATIONSHIPS                                                          │
+  ├────────────────────────────────────────────────────────────────────────────┤
+  │                                                                            │
+  │  User ──┬── 1:M ──► User_Info          (tracks profile changes over time) │
+  │         ├── 1:M ──► Appointment        (schedules medical visits)         │
+  │         ├── 1:M ──► Patient_Condition  (records health conditions)        │
+  │         ├── 1:M ──► Medication_Request (tracks prescriptions)             │
+  │         ├── 1:M ──► User_Device_Profile(owns fitness devices)             │
+  │         └── 1:M ──► Observation        (records telemetry data)           │
+  │                                                                            │
+  │  Practitioner ──┬── 1:M ──► Appointment        (conducts visits)          │
+  │                 └── 1:M ──► Medication_Request (prescribes medications)   │
+  │                                                                            │
+  │  Device_Ref ────┬── 1:M ──► Device_Capabilities (defines what it tracks) │
+  │                 └── 1:M ──► User_Device_Profile (catalog reference)       │
+  │                                                                            │
+  │  Metric_Ref ────┬── 1:M ──► Device_Capabilities (which devices measure)  │
+  │                 ├── 1:M ──► User_Device_Config  (user metric settings)    │
+  │                 └── 1:M ──► Observation         (recorded measurements)   │
+  │                                                                            │
+  │  User_Device_Profile ─┬── 1:M ──► User_Device_Config (metric settings)   │
+  │                       └── 1:M ──► Observation        (generates readings) │
+  │                                                                            │
+  └────────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+                         DESIGN PATTERNS USED
+================================================================================
+
+  1. SCD Type 2 (Slowly Changing Dimension)
+     └── User_Info: effective_date as part of composite PK tracks history
+
+  2. EAV (Entity-Attribute-Value)
+     └── Observation: stores metrics vertically for flexibility & scale
+
+  3. Catalog + Instance
+     └── Device_Ref (catalog) → User_Device_Profile (user instances)
+
+  4. Check Constraint Pattern
+     └── User_Device_Profile: requires EITHER model_id OR custom_device_name
+
+================================================================================

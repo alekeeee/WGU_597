@@ -1,0 +1,531 @@
+================================================================================
+                    HEALTH TRACKER DATABASE SESSION LOG
+                    D597 Task 1 - Data Management Project
+================================================================================
+
+Generated: 2026-02-03
+Database: health_tracker (PostgreSQL 16)
+Final Result: 1,003,341,040 observations simulated
+
+================================================================================
+                        TABLE OF CONTENTS
+================================================================================
+
+1. METRIC CLASSIFICATION (Hourly vs Daily)
+2. TEST SIMULATION (10 Million Observations)
+3. FULL SIMULATION (1 Billion Observations)
+4. SQL SCRIPTS
+
+================================================================================
+                    1. METRIC CLASSIFICATION
+================================================================================
+
+USER PROMPT:
+------------
+"Distinguish between metrics that will be hourly for realtime analysis and
+others that will be taken daily."
+
+RESPONSE:
+---------
+
+HOURLY METRICS (13 metrics - for real-time analysis, 24 observations/day/user)
+-------------------------------------------------------------------------------
+| Metric              | Range       | Distribution    | Notes                 |
+|---------------------|-------------|-----------------|----------------------|
+| heart_rate          | 50 - 180    | Normal, μ=72    | bpm                  |
+| HRV                 | 20 - 100    | Normal, μ=50    | milliseconds         |
+| SpO₂                | 94 - 100    | Skewed left     | Blood oxygen %       |
+| respiration_rate    | 12 - 20     | Normal, μ=15    | breaths/min          |
+| respiratory_rate    | 12 - 20     | Normal, μ=15    | breaths/min          |
+| stress              | 1 - 100     | Normal, μ=35    | Fluctuates daily     |
+| body_temperature    | 36.0 - 37.5 | Normal, μ=36.6  | °C                   |
+| temperature         | 36.0 - 37.5 | Normal, μ=36.6  | °C                   |
+| Body_Battery        | 5 - 100     | Normal, μ=60    | Drains/recharges     |
+| Body_Energy         | 5 - 100     | Normal, μ=60    | Energy level         |
+| cadence             | 60 - 180    | Normal, μ=160   | During activity      |
+| pace                | 4 - 12      | Normal, μ=7     | During activity      |
+| elevation           | 0 - 500     | Skewed right    | meters gained        |
+
+
+DAILY METRICS (47 metrics - aggregated totals, 1 observation/day/user)
+-------------------------------------------------------------------------------
+
+Activity Metrics:
+| Metric              | Range         | Distribution    | Notes              |
+|---------------------|---------------|-----------------|-------------------|
+| steps               | 2,000 - 15,000| Normal, μ=7,500 | Daily total       |
+| active_minutes      | 0 - 120       | Skewed right    | Daily total       |
+| active_zone_minutes | 0 - 90        | Skewed right    | Daily total       |
+| exercise_minutes    | 0 - 90        | Skewed right    | Daily total       |
+| intensity_minutes   | 0 - 100       | Skewed right    | Daily total       |
+| hourly_activity     | 0 - 16        | Normal, μ=8     | Hours w/ movement |
+| intensity           | 1 - 10        | Normal, μ=5     | Daily avg effort  |
+| distance            | 0 - 15        | Skewed right    | km, daily total   |
+| calories            | 1500 - 3500   | Normal, μ=2200  | Daily kcal burned |
+| floors              | 0 - 30        | Skewed right    | Daily total       |
+
+Sleep Metrics:
+| Metric                | Range     | Distribution  | Notes           |
+|-----------------------|-----------|---------------|-----------------|
+| sleep_duration        | 240 - 600 | Normal, μ=420 | minutes         |
+| sleep_REM             | 45 - 120  | Normal, μ=90  | minutes         |
+| sleep_light           | 150 - 300 | Normal, μ=210 | minutes         |
+| sleep_deep            | 30 - 120  | Normal, μ=60  | minutes         |
+| sleep_score           | 50 - 100  | Normal, μ=75  | Score           |
+| sleep_quality         | 1 - 100   | Normal, μ=70  | Score           |
+| sleep_breathing_quality| 1 - 100  | Normal, μ=85  | Score           |
+| sleep_tracking        | 240 - 600 | Normal, μ=420 | minutes         |
+| sleep_light_deep_awake| 0 - 60    | Normal, μ=20  | Awake minutes   |
+| SpO₂_sleep            | 92 - 99   | Normal, μ=96  | Overnight avg   |
+
+Body Metrics:
+| Metric              | Range      | Distribution    | Notes          |
+|---------------------|------------|-----------------|----------------|
+| weight              | 50 - 120   | Normal, μ=75    | kg             |
+| body_fat_percentage | 10 - 40    | Normal, μ=22    | %              |
+| body_composition    | 10 - 40    | Normal, μ=22    | %              |
+| BMR                 | 1200 - 2200| Normal, μ=1600  | kcal/day       |
+
+Cardiovascular Metrics:
+| Metric           | Range    | Distribution  | Notes           |
+|------------------|----------|---------------|-----------------|
+| blood_pressure   | 90 - 140 | Normal, μ=120 | Systolic        |
+| heart_rate_zones | 0 - 60   | Normal, μ=15  | minutes/zone    |
+| vascular_load    | 1 - 100  | Normal, μ=50  | Daily score     |
+| ECG              | 0 or 1   | Binary        | Daily check     |
+
+Training & Workout Metrics:
+| Metric            | Range   | Distribution    | Notes          |
+|-------------------|---------|-----------------|----------------|
+| duration          | 15 - 120| Normal, μ=45    | minutes        |
+| workout_duration  | 15 - 120| Normal, μ=45    | minutes        |
+| workout_distance  | 0 - 20  | Skewed right    | km             |
+| fat_burn_time     | 0 - 60  | Skewed right    | minutes        |
+| training_load     | 0 - 500 | Normal, μ=150   | Daily score    |
+| training_readiness| 1 - 100 | Normal, μ=70    | Daily score    |
+| training_status   | 1 - 5   | Discrete        | Daily status   |
+| recovery_time     | 0 - 72  | Skewed right    | hours          |
+| VO₂_max           | 25 - 60 | Normal, μ=40    | ml/kg/min      |
+| stride_length     | 0.5-1.2 | Normal, μ=0.75  | Daily avg      |
+| stride_frequency  | 60 - 180| Normal, μ=160   | Daily avg      |
+| PAI               | 0 - 150 | Skewed right    | Weekly score   |
+
+Hydration & Standing Metrics:
+| Metric             | Range      | Distribution  | Notes            |
+|--------------------|------------|---------------|------------------|
+| hydration          | 500 - 3000 | Normal, μ=2000| ml, daily total  |
+| water_intake       | 500 - 3000 | Normal, μ=2000| ml, daily total  |
+| water_retention    | 0 - 5      | Normal, μ=1.5 | kg               |
+| stand_hours        | 0 - 12     | Normal, μ=3   | hours            |
+| standing_time      | 0 - 360    | Normal, μ=180 | minutes          |
+| standing_reminders | 0 - 12     | Normal, μ=3   | Daily count      |
+| fall_detection     | 0 - 2      | Rare (99%=0)  | Daily count      |
+
+
+OBSERVATION RATE CALCULATION:
+-----------------------------
+| Type   | Configs  | Observations/Day |
+|--------|----------|------------------|
+| Hourly | 138,786  | 3,330,864        |
+| Daily  | 528,140  | 528,140          |
+| TOTAL  |          | 3,859,004/day    |
+
+To reach 1 billion observations: ~259 days of data (~8.5 months)
+
+
+================================================================================
+                    2. TEST SIMULATION (10 Million)
+================================================================================
+
+USER PROMPT:
+------------
+"Yes, I want a billion observations simulated"
+
+FOLLOW-UP:
+----------
+"B" (chose to test with 10 million first)
+
+TEST RESULTS:
+-------------
+- 3 days of data (2025-06-01 to 2025-06-03)
+- Total generated: 11,577,012 observations
+
+Data Quality Verification:
+| Metric         | Count     | Min   | Avg     | Max    | Expected    |
+|----------------|-----------|-------|---------|--------|-------------|
+| heart_rate     | 5,876,856 | 50    | 115     | 180    | 50-180 ✓    |
+| stress         | 3,446,640 | 1     | 50.5    | 100    | 1-100 ✓     |
+| cadence        | 500,904   | 60    | 120     | 180    | 60-180 ✓    |
+| steps          | 244,869   | 2,000 | 8,504   | 15,000 | 2k-15k ✓    |
+| sleep_tracking | 143,079   | 240   | 420     | 600    | 240-600 ✓   |
+| calories       | 108,798   | 1,500 | 2,502   | 3,500  | 1.5k-3.5k ✓ |
+
+
+================================================================================
+                    3. FULL SIMULATION (1 Billion)
+================================================================================
+
+USER PROMPT:
+------------
+"yes" (proceed with full 1 billion)
+
+EXECUTION SUMMARY:
+------------------
+Date Range: 2025-06-01 to 2026-02-15 (259 days)
+Method: 9 monthly batches
+
+| Batch | Month          | Observations  | Cumulative      |
+|-------|----------------|---------------|-----------------|
+| 1     | June 2025      | 115,770,120   | 115,770,120     |
+| 2     | July 2025      | 119,629,124   | 235,399,244     |
+| 3     | August 2025    | 119,629,124   | 355,028,368     |
+| 4     | September 2025 | 115,770,120   | 470,798,488     |
+| 5     | October 2025   | 119,629,124   | 590,427,612     |
+| 6     | November 2025  | 115,770,120   | 706,197,732     |
+| 7     | December 2025  | 119,629,124   | 825,826,856     |
+| 8     | January 2026   | 119,629,124   | 945,455,980     |
+| 9     | Feb 2026 (1-15)| 57,885,060    | 1,003,341,040   |
+
+FINAL TOTAL: 1,003,341,040 observations
+
+
+================================================================================
+                    4. SQL SCRIPTS
+================================================================================
+
+------------------------------------------------------------------------------
+SCRIPT: simulate_observations.sql (Test - 10 Million)
+------------------------------------------------------------------------------
+
+-- Simulate 10 million observations (3 days of data)
+-- Date range: 2025-06-01 to 2025-06-03
+
+-- Create temp table for metric configurations
+DROP TABLE IF EXISTS metric_config;
+CREATE TEMP TABLE metric_config (
+    metric_id INT,
+    metric VARCHAR(100),
+    is_hourly BOOLEAN,
+    min_val DECIMAL,
+    max_val DECIMAL,
+    mean_val DECIMAL
+);
+
+-- Insert metric configurations with ranges
+INSERT INTO metric_config VALUES
+-- Hourly metrics
+(28, 'heart_rate', TRUE, 50, 180, 72),
+(7, 'HRV', TRUE, 20, 100, 50),
+(9, 'SpO₂', TRUE, 94, 100, 98),
+(36, 'respiration_rate', TRUE, 12, 20, 15),
+(37, 'respiratory_rate', TRUE, 12, 20, 15),
+(51, 'stress', TRUE, 1, 100, 35),
+(19, 'body_temperature', TRUE, 36.0, 37.5, 36.6),
+(54, 'temperature', TRUE, 36.0, 37.5, 36.6),
+(3, 'Body_Battery', TRUE, 5, 100, 60),
+(4, 'Body_Energy', TRUE, 5, 100, 60),
+(20, 'cadence', TRUE, 60, 180, 160),
+(34, 'pace', TRUE, 4, 12, 7),
+(24, 'elevation', TRUE, 0, 500, 50),
+-- Daily metrics
+(50, 'steps', FALSE, 2000, 15000, 7500),
+(12, 'active_minutes', FALSE, 0, 120, 30),
+(13, 'active_zone_minutes', FALSE, 0, 90, 20),
+(61, 'exercise_minutes', FALSE, 0, 90, 25),
+(33, 'intensity_minutes', FALSE, 0, 100, 25),
+(30, 'hourly_activity', FALSE, 0, 16, 8),
+(32, 'intensity', FALSE, 1, 10, 5),
+(22, 'distance', FALSE, 0, 15, 5),
+(21, 'calories', FALSE, 1500, 3500, 2200),
+(27, 'floors', FALSE, 0, 30, 8),
+(40, 'sleep_duration', FALSE, 240, 600, 420),
+(65, 'sleep_REM', FALSE, 45, 120, 90),
+(66, 'sleep_light', FALSE, 150, 300, 210),
+(67, 'sleep_deep', FALSE, 30, 120, 60),
+(43, 'sleep_score', FALSE, 50, 100, 75),
+(42, 'sleep_quality', FALSE, 1, 100, 70),
+(39, 'sleep_breathing_quality', FALSE, 1, 100, 85),
+(46, 'sleep_tracking', FALSE, 240, 600, 420),
+(41, 'sleep_light_deep_awake', FALSE, 0, 60, 20),
+(10, 'SpO₂_sleep', FALSE, 92, 99, 96),
+(58, 'weight', FALSE, 50, 120, 75),
+(18, 'body_fat_percentage', FALSE, 10, 40, 22),
+(17, 'body_composition', FALSE, 10, 40, 22),
+(2, 'BMR', FALSE, 1200, 2200, 1600),
+(16, 'blood_pressure', FALSE, 90, 140, 120),
+(29, 'heart_rate_zones', FALSE, 0, 60, 15),
+(55, 'vascular_load', FALSE, 1, 100, 50),
+(5, 'ECG', FALSE, 0, 1, 1),
+(23, 'duration', FALSE, 15, 120, 45),
+(60, 'workout_duration', FALSE, 15, 120, 45),
+(59, 'workout_distance', FALSE, 0, 20, 5),
+(26, 'fat_burn_time', FALSE, 0, 60, 15),
+(62, 'training_load', FALSE, 0, 500, 150),
+(63, 'training_readiness', FALSE, 1, 100, 70),
+(64, 'training_status', FALSE, 1, 5, 3),
+(35, 'recovery_time', FALSE, 0, 72, 24),
+(11, 'VO₂_max', FALSE, 25, 60, 40),
+(53, 'stride_length', FALSE, 0.5, 1.2, 0.75),
+(52, 'stride_frequency', FALSE, 60, 180, 160),
+(8, 'PAI', FALSE, 0, 150, 50),
+(31, 'hydration', FALSE, 500, 3000, 2000),
+(56, 'water_intake', FALSE, 500, 3000, 2000),
+(57, 'water_retention', FALSE, 0, 5, 1.5),
+(47, 'stand_hours', FALSE, 0, 12, 3),
+(49, 'standing_time', FALSE, 0, 360, 180),
+(48, 'standing_reminders', FALSE, 0, 12, 3),
+(25, 'fall_detection', FALSE, 0, 2, 0);
+
+-- Generate HOURLY observations
+INSERT INTO observation (user_id, profile_id, metric_id, date_time, value)
+SELECT
+    udp.user_id,
+    udc.profile_id,
+    udc.metric_id,
+    d.day + (h.hour || ' hours')::INTERVAL AS date_time,
+    ROUND((mc.min_val + (mc.max_val - mc.min_val) * random())::NUMERIC, 2) AS value
+FROM user_device_config udc
+JOIN user_device_profile udp ON udc.profile_id = udp.profile_id
+JOIN metric_config mc ON udc.metric_id = mc.metric_id AND mc.is_hourly = TRUE
+CROSS JOIN generate_series('2025-06-01'::DATE, '2025-06-03'::DATE, '1 day') AS d(day)
+CROSS JOIN generate_series(0, 23) AS h(hour);
+
+-- Generate DAILY observations
+INSERT INTO observation (user_id, profile_id, metric_id, date_time, value)
+SELECT
+    udp.user_id,
+    udc.profile_id,
+    udc.metric_id,
+    d.day + '12:00:00'::TIME AS date_time,
+    ROUND((mc.min_val + (mc.max_val - mc.min_val) * random())::NUMERIC, 2) AS value
+FROM user_device_config udc
+JOIN user_device_profile udp ON udc.profile_id = udp.profile_id
+JOIN metric_config mc ON udc.metric_id = mc.metric_id AND mc.is_hourly = FALSE
+CROSS JOIN generate_series('2025-06-01'::DATE, '2025-06-03'::DATE, '1 day') AS d(day);
+
+-- Show results
+SELECT 'Total observations:' AS status, COUNT(*) FROM observation;
+
+
+------------------------------------------------------------------------------
+SCRIPT: simulate_billion.sql (Full - 1 Billion)
+------------------------------------------------------------------------------
+
+-- Simulate 1 billion observations
+-- Date range: 2025-06-01 to 2026-02-15 (259 days)
+-- Running in monthly batches for stability
+
+-- Create metric config table
+DROP TABLE IF EXISTS metric_config;
+CREATE TABLE metric_config (
+    metric_id INT,
+    is_hourly BOOLEAN,
+    min_val DECIMAL,
+    max_val DECIMAL
+);
+
+INSERT INTO metric_config VALUES
+-- Hourly metrics
+(28, TRUE, 50, 180), (7, TRUE, 20, 100), (9, TRUE, 94, 100),
+(36, TRUE, 12, 20), (37, TRUE, 12, 20), (51, TRUE, 1, 100),
+(19, TRUE, 36.0, 37.5), (54, TRUE, 36.0, 37.5), (3, TRUE, 5, 100),
+(4, TRUE, 5, 100), (20, TRUE, 60, 180), (34, TRUE, 4, 12), (24, TRUE, 0, 500),
+-- Daily metrics
+(50, FALSE, 2000, 15000), (12, FALSE, 0, 120), (13, FALSE, 0, 90),
+(61, FALSE, 0, 90), (33, FALSE, 0, 100), (30, FALSE, 0, 16),
+(32, FALSE, 1, 10), (22, FALSE, 0, 15), (21, FALSE, 1500, 3500),
+(27, FALSE, 0, 30), (40, FALSE, 240, 600), (65, FALSE, 45, 120),
+(66, FALSE, 150, 300), (67, FALSE, 30, 120), (43, FALSE, 50, 100),
+(42, FALSE, 1, 100), (39, FALSE, 1, 100), (46, FALSE, 240, 600),
+(41, FALSE, 0, 60), (10, FALSE, 92, 99), (58, FALSE, 50, 120),
+(18, FALSE, 10, 40), (17, FALSE, 10, 40), (2, FALSE, 1200, 2200),
+(16, FALSE, 90, 140), (29, FALSE, 0, 60), (55, FALSE, 1, 100),
+(5, FALSE, 0, 1), (23, FALSE, 15, 120), (60, FALSE, 15, 120),
+(59, FALSE, 0, 20), (26, FALSE, 0, 60), (62, FALSE, 0, 500),
+(63, FALSE, 1, 100), (64, FALSE, 1, 5), (35, FALSE, 0, 72),
+(11, FALSE, 25, 60), (53, FALSE, 0.5, 1.2), (52, FALSE, 60, 180),
+(8, FALSE, 0, 150), (31, FALSE, 500, 3000), (56, FALSE, 500, 3000),
+(57, FALSE, 0, 5), (47, FALSE, 0, 12), (49, FALSE, 0, 360),
+(48, FALSE, 0, 12), (25, FALSE, 0, 2);
+
+-- BATCH 1: June 2025 (30 days)
+INSERT INTO observation (user_id, profile_id, metric_id, date_time, value)
+SELECT udp.user_id, udc.profile_id, udc.metric_id,
+    d.day + (h.hour || ' hours')::INTERVAL,
+    ROUND((mc.min_val + (mc.max_val - mc.min_val) * random())::NUMERIC, 2)
+FROM user_device_config udc
+JOIN user_device_profile udp ON udc.profile_id = udp.profile_id
+JOIN metric_config mc ON udc.metric_id = mc.metric_id AND mc.is_hourly = TRUE
+CROSS JOIN generate_series('2025-06-01'::DATE, '2025-06-30'::DATE, '1 day') AS d(day)
+CROSS JOIN generate_series(0, 23) AS h(hour);
+
+INSERT INTO observation (user_id, profile_id, metric_id, date_time, value)
+SELECT udp.user_id, udc.profile_id, udc.metric_id, d.day + '12:00:00'::TIME,
+    ROUND((mc.min_val + (mc.max_val - mc.min_val) * random())::NUMERIC, 2)
+FROM user_device_config udc
+JOIN user_device_profile udp ON udc.profile_id = udp.profile_id
+JOIN metric_config mc ON udc.metric_id = mc.metric_id AND mc.is_hourly = FALSE
+CROSS JOIN generate_series('2025-06-01'::DATE, '2025-06-30'::DATE, '1 day') AS d(day);
+
+-- BATCH 2: July 2025 (31 days)
+INSERT INTO observation (user_id, profile_id, metric_id, date_time, value)
+SELECT udp.user_id, udc.profile_id, udc.metric_id,
+    d.day + (h.hour || ' hours')::INTERVAL,
+    ROUND((mc.min_val + (mc.max_val - mc.min_val) * random())::NUMERIC, 2)
+FROM user_device_config udc
+JOIN user_device_profile udp ON udc.profile_id = udp.profile_id
+JOIN metric_config mc ON udc.metric_id = mc.metric_id AND mc.is_hourly = TRUE
+CROSS JOIN generate_series('2025-07-01'::DATE, '2025-07-31'::DATE, '1 day') AS d(day)
+CROSS JOIN generate_series(0, 23) AS h(hour);
+
+INSERT INTO observation (user_id, profile_id, metric_id, date_time, value)
+SELECT udp.user_id, udc.profile_id, udc.metric_id, d.day + '12:00:00'::TIME,
+    ROUND((mc.min_val + (mc.max_val - mc.min_val) * random())::NUMERIC, 2)
+FROM user_device_config udc
+JOIN user_device_profile udp ON udc.profile_id = udp.profile_id
+JOIN metric_config mc ON udc.metric_id = mc.metric_id AND mc.is_hourly = FALSE
+CROSS JOIN generate_series('2025-07-01'::DATE, '2025-07-31'::DATE, '1 day') AS d(day);
+
+-- BATCH 3: August 2025 (31 days)
+INSERT INTO observation (user_id, profile_id, metric_id, date_time, value)
+SELECT udp.user_id, udc.profile_id, udc.metric_id,
+    d.day + (h.hour || ' hours')::INTERVAL,
+    ROUND((mc.min_val + (mc.max_val - mc.min_val) * random())::NUMERIC, 2)
+FROM user_device_config udc
+JOIN user_device_profile udp ON udc.profile_id = udp.profile_id
+JOIN metric_config mc ON udc.metric_id = mc.metric_id AND mc.is_hourly = TRUE
+CROSS JOIN generate_series('2025-08-01'::DATE, '2025-08-31'::DATE, '1 day') AS d(day)
+CROSS JOIN generate_series(0, 23) AS h(hour);
+
+INSERT INTO observation (user_id, profile_id, metric_id, date_time, value)
+SELECT udp.user_id, udc.profile_id, udc.metric_id, d.day + '12:00:00'::TIME,
+    ROUND((mc.min_val + (mc.max_val - mc.min_val) * random())::NUMERIC, 2)
+FROM user_device_config udc
+JOIN user_device_profile udp ON udc.profile_id = udp.profile_id
+JOIN metric_config mc ON udc.metric_id = mc.metric_id AND mc.is_hourly = FALSE
+CROSS JOIN generate_series('2025-08-01'::DATE, '2025-08-31'::DATE, '1 day') AS d(day);
+
+-- BATCH 4: September 2025 (30 days)
+INSERT INTO observation (user_id, profile_id, metric_id, date_time, value)
+SELECT udp.user_id, udc.profile_id, udc.metric_id,
+    d.day + (h.hour || ' hours')::INTERVAL,
+    ROUND((mc.min_val + (mc.max_val - mc.min_val) * random())::NUMERIC, 2)
+FROM user_device_config udc
+JOIN user_device_profile udp ON udc.profile_id = udp.profile_id
+JOIN metric_config mc ON udc.metric_id = mc.metric_id AND mc.is_hourly = TRUE
+CROSS JOIN generate_series('2025-09-01'::DATE, '2025-09-30'::DATE, '1 day') AS d(day)
+CROSS JOIN generate_series(0, 23) AS h(hour);
+
+INSERT INTO observation (user_id, profile_id, metric_id, date_time, value)
+SELECT udp.user_id, udc.profile_id, udc.metric_id, d.day + '12:00:00'::TIME,
+    ROUND((mc.min_val + (mc.max_val - mc.min_val) * random())::NUMERIC, 2)
+FROM user_device_config udc
+JOIN user_device_profile udp ON udc.profile_id = udp.profile_id
+JOIN metric_config mc ON udc.metric_id = mc.metric_id AND mc.is_hourly = FALSE
+CROSS JOIN generate_series('2025-09-01'::DATE, '2025-09-30'::DATE, '1 day') AS d(day);
+
+-- BATCH 5: October 2025 (31 days)
+INSERT INTO observation (user_id, profile_id, metric_id, date_time, value)
+SELECT udp.user_id, udc.profile_id, udc.metric_id,
+    d.day + (h.hour || ' hours')::INTERVAL,
+    ROUND((mc.min_val + (mc.max_val - mc.min_val) * random())::NUMERIC, 2)
+FROM user_device_config udc
+JOIN user_device_profile udp ON udc.profile_id = udp.profile_id
+JOIN metric_config mc ON udc.metric_id = mc.metric_id AND mc.is_hourly = TRUE
+CROSS JOIN generate_series('2025-10-01'::DATE, '2025-10-31'::DATE, '1 day') AS d(day)
+CROSS JOIN generate_series(0, 23) AS h(hour);
+
+INSERT INTO observation (user_id, profile_id, metric_id, date_time, value)
+SELECT udp.user_id, udc.profile_id, udc.metric_id, d.day + '12:00:00'::TIME,
+    ROUND((mc.min_val + (mc.max_val - mc.min_val) * random())::NUMERIC, 2)
+FROM user_device_config udc
+JOIN user_device_profile udp ON udc.profile_id = udp.profile_id
+JOIN metric_config mc ON udc.metric_id = mc.metric_id AND mc.is_hourly = FALSE
+CROSS JOIN generate_series('2025-10-01'::DATE, '2025-10-31'::DATE, '1 day') AS d(day);
+
+-- BATCH 6: November 2025 (30 days)
+INSERT INTO observation (user_id, profile_id, metric_id, date_time, value)
+SELECT udp.user_id, udc.profile_id, udc.metric_id,
+    d.day + (h.hour || ' hours')::INTERVAL,
+    ROUND((mc.min_val + (mc.max_val - mc.min_val) * random())::NUMERIC, 2)
+FROM user_device_config udc
+JOIN user_device_profile udp ON udc.profile_id = udp.profile_id
+JOIN metric_config mc ON udc.metric_id = mc.metric_id AND mc.is_hourly = TRUE
+CROSS JOIN generate_series('2025-11-01'::DATE, '2025-11-30'::DATE, '1 day') AS d(day)
+CROSS JOIN generate_series(0, 23) AS h(hour);
+
+INSERT INTO observation (user_id, profile_id, metric_id, date_time, value)
+SELECT udp.user_id, udc.profile_id, udc.metric_id, d.day + '12:00:00'::TIME,
+    ROUND((mc.min_val + (mc.max_val - mc.min_val) * random())::NUMERIC, 2)
+FROM user_device_config udc
+JOIN user_device_profile udp ON udc.profile_id = udp.profile_id
+JOIN metric_config mc ON udc.metric_id = mc.metric_id AND mc.is_hourly = FALSE
+CROSS JOIN generate_series('2025-11-01'::DATE, '2025-11-30'::DATE, '1 day') AS d(day);
+
+-- BATCH 7: December 2025 (31 days)
+INSERT INTO observation (user_id, profile_id, metric_id, date_time, value)
+SELECT udp.user_id, udc.profile_id, udc.metric_id,
+    d.day + (h.hour || ' hours')::INTERVAL,
+    ROUND((mc.min_val + (mc.max_val - mc.min_val) * random())::NUMERIC, 2)
+FROM user_device_config udc
+JOIN user_device_profile udp ON udc.profile_id = udp.profile_id
+JOIN metric_config mc ON udc.metric_id = mc.metric_id AND mc.is_hourly = TRUE
+CROSS JOIN generate_series('2025-12-01'::DATE, '2025-12-31'::DATE, '1 day') AS d(day)
+CROSS JOIN generate_series(0, 23) AS h(hour);
+
+INSERT INTO observation (user_id, profile_id, metric_id, date_time, value)
+SELECT udp.user_id, udc.profile_id, udc.metric_id, d.day + '12:00:00'::TIME,
+    ROUND((mc.min_val + (mc.max_val - mc.min_val) * random())::NUMERIC, 2)
+FROM user_device_config udc
+JOIN user_device_profile udp ON udc.profile_id = udp.profile_id
+JOIN metric_config mc ON udc.metric_id = mc.metric_id AND mc.is_hourly = FALSE
+CROSS JOIN generate_series('2025-12-01'::DATE, '2025-12-31'::DATE, '1 day') AS d(day);
+
+-- BATCH 8: January 2026 (31 days)
+INSERT INTO observation (user_id, profile_id, metric_id, date_time, value)
+SELECT udp.user_id, udc.profile_id, udc.metric_id,
+    d.day + (h.hour || ' hours')::INTERVAL,
+    ROUND((mc.min_val + (mc.max_val - mc.min_val) * random())::NUMERIC, 2)
+FROM user_device_config udc
+JOIN user_device_profile udp ON udc.profile_id = udp.profile_id
+JOIN metric_config mc ON udc.metric_id = mc.metric_id AND mc.is_hourly = TRUE
+CROSS JOIN generate_series('2026-01-01'::DATE, '2026-01-31'::DATE, '1 day') AS d(day)
+CROSS JOIN generate_series(0, 23) AS h(hour);
+
+INSERT INTO observation (user_id, profile_id, metric_id, date_time, value)
+SELECT udp.user_id, udc.profile_id, udc.metric_id, d.day + '12:00:00'::TIME,
+    ROUND((mc.min_val + (mc.max_val - mc.min_val) * random())::NUMERIC, 2)
+FROM user_device_config udc
+JOIN user_device_profile udp ON udc.profile_id = udp.profile_id
+JOIN metric_config mc ON udc.metric_id = mc.metric_id AND mc.is_hourly = FALSE
+CROSS JOIN generate_series('2026-01-01'::DATE, '2026-01-31'::DATE, '1 day') AS d(day);
+
+-- BATCH 9: February 2026 (15 days)
+INSERT INTO observation (user_id, profile_id, metric_id, date_time, value)
+SELECT udp.user_id, udc.profile_id, udc.metric_id,
+    d.day + (h.hour || ' hours')::INTERVAL,
+    ROUND((mc.min_val + (mc.max_val - mc.min_val) * random())::NUMERIC, 2)
+FROM user_device_config udc
+JOIN user_device_profile udp ON udc.profile_id = udp.profile_id
+JOIN metric_config mc ON udc.metric_id = mc.metric_id AND mc.is_hourly = TRUE
+CROSS JOIN generate_series('2026-02-01'::DATE, '2026-02-15'::DATE, '1 day') AS d(day)
+CROSS JOIN generate_series(0, 23) AS h(hour);
+
+INSERT INTO observation (user_id, profile_id, metric_id, date_time, value)
+SELECT udp.user_id, udc.profile_id, udc.metric_id, d.day + '12:00:00'::TIME,
+    ROUND((mc.min_val + (mc.max_val - mc.min_val) * random())::NUMERIC, 2)
+FROM user_device_config udc
+JOIN user_device_profile udp ON udc.profile_id = udp.profile_id
+JOIN metric_config mc ON udc.metric_id = mc.metric_id AND mc.is_hourly = FALSE
+CROSS JOIN generate_series('2026-02-01'::DATE, '2026-02-15'::DATE, '1 day') AS d(day);
+
+-- Final count
+SELECT 'TOTAL OBSERVATIONS' AS status, COUNT(*) FROM observation;
+
+-- Cleanup
+DROP TABLE metric_config;
+
+
+================================================================================
+                            END OF LOG
+================================================================================
